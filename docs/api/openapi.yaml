@@ -1,0 +1,196 @@
+openapi: 3.0.3
+
+info:
+  title: Movie Recommendations API
+  description: API рекомендательной системы фильмов. ML-модель подбирает фильмы на основе оценок пользователя и его любимых жанров.
+  version: 1.0.0
+
+servers:
+  - url: https://example.com/api/v1
+
+paths:
+  /recommendations:
+    post:
+      summary: Сформировать персональные рекомендации
+      description: >
+        Передаёт ML-модели идентификатор пользователя и возвращает список подходящих фильмов.
+        Фильмы, которые пользователь уже оценил, в список не попадают.
+        Если данных о пользователе недостаточно, возвращаются популярные фильмы.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - userId
+              properties:
+                userId:
+                  type: integer
+                  description: Идентификатор пользователя
+                  example: 42
+                limit:
+                  type: integer
+                  description: Количество фильмов в списке
+                  minimum: 1
+                  maximum: 50
+                  default: 10
+                  example: 10
+                genres:
+                  type: array
+                  description: Жанры, которые нужно учитывать (необязательно)
+                  items:
+                    type: string
+                  example:
+                    - comedy
+                    - drama
+      responses:
+        '200':
+          description: Рекомендации сформированы
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Recommendation'
+        '400':
+          description: Некорректный запрос
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                code: INVALID_USER_ID
+                message: userId must be a positive integer
+        '404':
+          description: Пользователь не найден
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                code: USER_NOT_FOUND
+                message: User with id 42 not found
+        '503':
+          description: ML-модель временно недоступна
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                code: MODEL_UNAVAILABLE
+                message: Recommendation model is temporarily unavailable
+
+  /recommendations/{userId}:
+    get:
+      summary: Получить последние рекомендации пользователя
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          description: Идентификатор пользователя
+          schema:
+            type: integer
+          example: 42
+      responses:
+        '200':
+          description: Рекомендации найдены
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Recommendation'
+        '404':
+          description: Рекомендации для пользователя не найдены
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                code: RECOMMENDATIONS_NOT_FOUND
+                message: No recommendations for user 42
+
+  /movies/{movieId}:
+    get:
+      summary: Получить карточку фильма
+      parameters:
+        - name: movieId
+          in: path
+          required: true
+          description: Идентификатор фильма
+          schema:
+            type: integer
+          example: 101
+      responses:
+        '200':
+          description: Фильм найден
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Movie'
+        '404':
+          description: Фильм не найден
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                code: MOVIE_NOT_FOUND
+                message: Movie with id 101 not found
+
+components:
+  schemas:
+    Movie:
+      type: object
+      properties:
+        id:
+          type: integer
+          example: 101
+        title:
+          type: string
+          example: Интерстеллар
+        genre:
+          type: string
+          example: sci-fi
+        year:
+          type: integer
+          example: 2014
+        rating:
+          type: number
+          format: float
+          example: 8.6
+
+    Recommendation:
+      type: object
+      properties:
+        recommendationId:
+          type: integer
+          example: 555
+        userId:
+          type: integer
+          example: 42
+        source:
+          type: string
+          description: personal - персональные рекомендации модели, popular - популярные фильмы
+          enum:
+            - personal
+            - popular
+          example: personal
+        modelVersion:
+          type: string
+          example: '1.2.0'
+        createdAt:
+          type: string
+          format: date-time
+          example: '2026-10-28T12:00:00Z'
+        movies:
+          type: array
+          items:
+            $ref: '#/components/schemas/Movie'
+
+    Error:
+      type: object
+      properties:
+        code:
+          type: string
+          example: INVALID_USER_ID
+        message:
+          type: string
+          example: userId must be a positive integer
